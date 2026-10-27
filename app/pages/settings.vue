@@ -189,6 +189,7 @@ onBeforeUnmount(() => {
       </div>
       <div v-else-if="!midi.connected" class="notice row">
         <span>Chrome asks once before a site may use MIDI devices.</span>
+        <span v-if="midi.error" class="muted small">{{ midi.error }}</span>
         <span class="spacer" />
         <button class="primary" :disabled="midi.connecting" @click="midi.connect()">
           Connect MIDI keyboard
