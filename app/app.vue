@@ -33,6 +33,9 @@ useHead({ meta: [{ name: 'theme-color', content: () => THEME_COLORS[theme.value]
       <AudioBadge :audio="audio" />
     </header>
     <NuxtPage />
+    <footer v-if="!immersive" class="footer">
+      <NuxtLink to="/privacy">Privacy</NuxtLink>
+    </footer>
   </div>
 </template>
 
@@ -68,6 +71,27 @@ nav a:hover {
 nav a.router-link-exact-active {
   color: var(--text);
   background: var(--surface-2);
+}
+
+.shell:not(.immersive) {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell:not(.immersive) > * {
+  width: 100%;
+}
+
+.footer {
+  margin-top: auto;
+  padding: 0 20px 24px;
+  text-align: center;
+  font-size: 0.82rem;
+}
+
+.footer a {
+  color: var(--muted);
 }
 
 @media (max-width: 640px) {
