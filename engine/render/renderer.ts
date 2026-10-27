@@ -1,7 +1,7 @@
 import type { LoopRange } from '../clock/transport'
 import { isVisible } from '../modes/hands'
 import type { Hand, HandModes, Measure, SongNote } from '../types'
-import { HIGHEST, LOWEST, layoutKeys, type KeyRect } from './keyboard-layout'
+import { HIGHEST, LOWEST, isBlack, layoutKeys, type KeyRect } from './keyboard-layout'
 import { pedalDown, type AlignedNote, type Interval, type TakeNote } from '../recording/take'
 
 export type NoteResult = { type: 'hit'; time: number; deviationMs: number } | { type: 'miss' }
@@ -50,6 +50,10 @@ export interface RisingFrame {
 
 /** Callouts drawn next to the most notable notes of a replay. */
 const MAX_TAGS = 3
+/** Gap in px around black-key notes, so they read as lying on top of the white lane. */
+const KNOCKOUT = 2
+/** Darkens black-key notes a little to tell them apart from white ones. */
+const BLACK_SHADE = 'rgb(0 0 0 / 0.2)'
 
 /** Colours come from the app theme (CSS custom properties), so light and dark both work. */
 export interface Palette {
@@ -249,6 +253,7 @@ export class Renderer {
     const to = f.songTime + this.options.lookahead
     const missed: SongNote[] = []
     const targets: SongNote[] = []
+    const drawn: SongNote[] = []
 
     if (f.replay) {
       this.drawReplay(f, f.replay, y, from, to)
@@ -272,6 +277,9 @@ export class Renderer {
         Math.abs(n.startSec - f.songTime) < 0.06
       )
         targets.push(n)
+      drawn.push(n)
+    }
+    for (const n of whiteFirst(drawn)) {
       this.drawNote(n, y(n.endSec), y(n.startSec), pxPerSec, f)
     }
 
@@ -325,6 +333,7 @@ export class Renderer {
       return
     }
 
+    if (key.black) this.knockout(x, ny, w, h, radius)
     ctx.globalAlpha = mode === 'auto' ? 0.5 : result?.type === 'miss' ? 0.28 : 1
     if (result?.type === 'hit' || (mode === 'auto' && sounding)) {
       ctx.shadowColor = p.light ? 'rgb(0 0 0 / 0.18)' : color
@@ -337,6 +346,10 @@ export class Renderer {
     ctx.shadowColor = 'transparent'
     ctx.shadowBlur = 0
     ctx.shadowOffsetY = 0
+    if (key.black) {
+      ctx.fillStyle = BLACK_SHADE
+      ctx.fill()
+    }
 
     if (n.hand === 'L' && w > 6) {
       ctx.fillStyle = p.leftStripe
@@ -568,13 +581,22 @@ export class Renderer {
       const inset = key.black ? 1.5 : Math.min(5, key.w * 0.12)
       const top = Math.max(-4, y(start))
       const bottom = y(end)
+      const h = Math.max(3, bottom - top)
+      if (key.black) this.knockout(key.x + inset, top, key.w - inset * 2, h, 4)
       ctx.globalAlpha = Math.max(0.15, 1 - ((f.now - end) / this.options.lookahead) * 0.8)
       ctx.fillStyle = p.rim
-      shape(ctx, key.x + inset, top, key.w - inset * 2, Math.max(3, bottom - top), 4)
+      shape(ctx, key.x + inset, top, key.w - inset * 2, h, 4)
       ctx.fill()
+      if (key.black) {
+        ctx.fillStyle = BLACK_SHADE
+        ctx.fill()
+      }
     }
-    for (const n of f.notes) draw(n.pitch, n.start, n.soundEnd)
-    for (const [pitch, start] of f.held) draw(pitch, start, f.now)
+    const trails = [
+      ...f.notes.map((n) => ({ pitch: n.pitch, start: n.start, end: n.soundEnd })),
+      ...Array.from(f.held, ([pitch, start]) => ({ pitch, start, end: f.now })),
+    ]
+    for (const t of whiteFirst(trails)) draw(t.pitch, t.start, t.end)
     ctx.globalAlpha = 1
 
     ctx.fillStyle = p.hitLine
@@ -610,11 +632,11 @@ export class Renderer {
 
     if (replay.mode === 'score') {
       if (replay.reference) {
-        for (const n of replay.reference) {
+        for (const n of whiteFirst(replay.reference)) {
           if (visible(n.start, n.end)) this.drawPlayed(n, n.pitch < 60 ? 'L' : 'R', y, 1)
         }
       } else {
-        for (const n of f.notes) {
+        for (const n of whiteFirst(f.notes)) {
           if (!visible(n.startSec, n.endSec) || !isVisible(n, f.handModes)) continue
           this.drawOutline(n.pitch, n.hand, y(n.endSec), y(n.startSec), true)
         }
@@ -624,12 +646,12 @@ export class Renderer {
 
     if (replay.mode === 'both') {
       if (replay.reference) {
-        for (const n of replay.reference) {
+        for (const n of whiteFirst(replay.reference)) {
           if (visible(n.start, n.end))
             this.drawOutline(n.pitch, n.pitch < 60 ? 'L' : 'R', y(n.end), y(n.start), false)
         }
       } else {
-        for (const n of f.notes) {
+        for (const n of whiteFirst(f.notes)) {
           if (!visible(n.startSec, n.endSec) || !isVisible(n, f.handModes)) continue
           this.drawOutline(n.pitch, n.hand, y(n.endSec), y(n.startSec), false)
         }
@@ -638,7 +660,7 @@ export class Renderer {
 
     const tags: { n: AlignedNote; text: string; weight: number }[] = []
     const window = this.options.timingWindowMs ?? 35
-    for (const n of replay.notes) {
+    for (const n of whiteFirst(replay.notes)) {
       if (!visible(n.start, n.end)) continue
       this.drawPlayed(n, n.hand, y, replay.mode === 'both' ? 0.62 : 1)
 
@@ -676,11 +698,30 @@ export class Renderer {
     const bottom = y(n.start)
     const h = Math.max(4, bottom - top - 2)
 
+    const radius = hand === 'L' ? 2 : Math.min(8, w / 2, h / 2)
+
+    if (key.black) this.knockout(x, bottom - h, w, h, radius)
     ctx.globalAlpha = 0.45 + 0.55 * Math.min(1, n.velocity / 110)
     ctx.fillStyle = this.handColor(hand)
-    shape(ctx, x, bottom - h, w, h, hand === 'L' ? 2 : Math.min(8, w / 2, h / 2))
+    shape(ctx, x, bottom - h, w, h, radius)
     ctx.fill()
+    if (key.black) {
+      ctx.fillStyle = BLACK_SHADE
+      ctx.fill()
+    }
     ctx.globalAlpha = 1
+  }
+
+  /** Cuts a gap around a black-key note so it reads as lying on top of a white one. */
+  private knockout(x: number, y: number, w: number, h: number, radius: number): void {
+    const { ctx, p } = this
+    const alpha = ctx.globalAlpha
+    ctx.globalAlpha = 1
+    ctx.strokeStyle = p.bg
+    ctx.lineWidth = KNOCKOUT * 2
+    shape(ctx, x, y, w, h, radius)
+    ctx.stroke()
+    ctx.globalAlpha = alpha
   }
 
   /** The note that should have been played, as an outline in its hand's shape. */
@@ -700,6 +741,7 @@ export class Renderer {
     const h = Math.max(4, bottom - top - 2)
     const radius = hand === 'L' ? 2 : Math.min(10, w / 2, h / 2)
 
+    if (key.black) this.knockout(x, bottom - h, w, h, radius)
     ctx.strokeStyle = this.handColor(hand)
     ctx.lineWidth = 2
     if (filled) {
@@ -775,6 +817,14 @@ function lowerBound(notes: readonly SongNote[], t: number): number {
     else hi = mid
   }
   return lo
+}
+
+/** Black-key notes go on top so overlaps with neighbouring white lanes always look the same. */
+function whiteFirst<T extends { pitch: number }>(items: Iterable<T>): T[] {
+  const whites: T[] = []
+  const blacks: T[] = []
+  for (const n of items) (isBlack(n.pitch) ? blacks : whites).push(n)
+  return [...whites, ...blacks]
 }
 
 function shape(
