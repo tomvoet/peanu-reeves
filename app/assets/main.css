@@ -1,0 +1,354 @@
+/* Colour tokens. Dark is the default, light is paper-toned and never pure white. */
+:root {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #0b0b0b;
+  --surface-2: #1c1c1c;
+  --line: #161616;
+  --border: #2a2a2a;
+  --text: #e8e8e8;
+  --hi: #ffffff;
+  --muted: #a3a3a3;
+  --faint: #8c8c8c;
+  --ink: 255 255 255;
+  --inv: #f2f2f2;
+  --inv-text: #000000;
+  --accent: var(--text);
+  /* Hands: blue left (square notes with a stripe), amber right (rounded notes). */
+  --left: #4e9be6;
+  --left-stripe: #2a63a0;
+  --right: #f2b544;
+  /* Mistakes only. */
+  --danger: #ff5c7a;
+  --miss: #a3a3a3;
+  --rim: #ffffff;
+  --key-bed: #000000;
+  --key-white: #161616;
+  --key-black: #050505;
+  --key-border: #2a2a2a;
+  --key-label: #8c8c8c;
+  --key-lit-label: #000000;
+  --grid: #1a1a1a;
+  --hit-line: rgb(255 255 255 / 0.25);
+  --heat-good: #1c1c1c;
+  --heat-ok: #3a3a3a;
+  --heat-weak: #8a6a72;
+  --heat-ink: #e8e8e8;
+  --radius: 12px;
+  --mono: 'Geist Mono Variable', ui-monospace, 'Cascadia Mono', monospace;
+  font-family: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-size: 15px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f2f0eb;
+  --surface: #faf9f6;
+  --surface-2: #e4e0d7;
+  --line: #e2ded6;
+  --border: #cbc5ba;
+  --text: #2b2b2b;
+  --hi: #161616;
+  --muted: #585858;
+  --faint: #666666;
+  --ink: 22 22 22;
+  --inv: #222222;
+  --inv-text: #f2f0eb;
+  --left: #1f6fbf;
+  --left-stripe: #154e88;
+  --right: #a86a00;
+  --danger: #d6334f;
+  --miss: #6e6e6e;
+  --rim: #161616;
+  --key-bed: #c9c3b8;
+  --key-white: #fbfaf7;
+  --key-black: #2b2b2b;
+  --key-border: #2b2b2b;
+  --key-label: #6b6b6b;
+  --key-lit-label: #ffffff;
+  --grid: #e2ded6;
+  --hit-line: rgb(22 22 22 / 0.3);
+  --heat-good: #e4e0d7;
+  --heat-ok: #cbc5ba;
+  --heat-weak: #d9a3ad;
+  --heat-ink: #2b2b2b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 20px 64px;
+  display: grid;
+  gap: 24px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+button,
+.btn {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+button:hover:not(:disabled),
+.btn:hover {
+  border-color: var(--faint);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button.primary,
+.btn.primary {
+  background: var(--inv);
+  border-color: var(--inv);
+  color: var(--inv-text);
+  font-weight: 600;
+}
+
+button.primary:hover:not(:disabled),
+.btn.primary:hover {
+  background: var(--hi);
+  border-color: var(--hi);
+}
+
+button.ghost,
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+button.ghost:hover:not(:disabled),
+.btn.ghost:hover {
+  background: var(--surface-2);
+}
+
+button.active {
+  background: var(--surface-2);
+  border-color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+.switch {
+  appearance: none;
+  position: relative;
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: var(--border);
+  cursor: pointer;
+  flex: none;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: translate 0.15s;
+}
+
+.switch:checked {
+  background: var(--inv);
+}
+
+.switch:checked::after {
+  translate: 16px 0;
+  background: var(--inv-text);
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  font-weight: 500;
+}
+
+.switch-row > .label,
+.switch-row > span:first-of-type {
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.switch-row small {
+  font-weight: 400;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+input,
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+input[type='range'] {
+  padding: 0;
+  accent-color: var(--text);
+}
+
+input[type='checkbox'] {
+  accent-color: var(--text);
+}
+
+label.field {
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+label.field > :not(span) {
+  color: var(--text);
+}
+
+.segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg);
+}
+
+.segmented button {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  padding: 5px 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.segmented button.active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+button.small {
+  padding: 4px 10px;
+  font-size: 14px;
+}
+
+.notice {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 10px 14px;
+  border-radius: 6px;
+}
+
+.notice.error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+th {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.hand-L {
+  color: var(--left);
+}
+
+.hand-R {
+  color: var(--right);
+}
