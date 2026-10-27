@@ -21,6 +21,8 @@ vp run generate       # static build in .output/public
 
 Web MIDI needs a secure origin. Localhost counts, anything else needs https.
 
+Every push to `master` builds and deploys to [piano.tomvoet.dev](https://piano.tomvoet.dev) through GitHub Pages (`.github/workflows/deploy.yml`).
+
 ## Code
 
 - `engine/` is the practice engine and has no Vue in it. Clock, MIDI input, piano audio, song parsing, note matching, stats and the canvas renderers.
@@ -64,3 +66,7 @@ Everything lives in the browser (IndexedDB and a bit of localStorage). Settings 
 If you link a folder, it gets rescanned on every launch. Chrome asks for permission again after a restart, the library has a button for that. Edited files keep their history.
 
 Piano samples load from GitHub Pages the first time and are cached after that.
+
+## License
+
+MIT

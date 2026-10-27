@@ -1,6 +1,7 @@
 {
   "name": "peanu-reeves",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "nuxt dev",
