@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AppSettings, Backup } from '#db/repositories'
+import { TONES } from '#engine/audio/tones'
 import { REMOTE_ACTIONS, type RemoteAction, type RemoteBinding } from '#engine/midi-input/remote'
 
 interface Option<T> {
@@ -327,6 +328,13 @@ onBeforeUnmount(() => {
         Above roughly 20–30 ms total the delay between key and sound becomes noticeable. Output
         latency is decided by the OS audio stack. A wired output device usually helps.
       </p>
+      <label class="field">
+        <span>Sound</span>
+        <select v-model="settings.tone">
+          <option v-for="(t, id) in TONES" :key="id" :value="id">{{ t.name }}</option>
+        </select>
+        <span class="muted small">{{ TONES[settings.tone].credit }}</span>
+      </label>
       <label class="field">
         <span>Volume: {{ settings.volume }}</span>
         <input v-model.number="settings.volume" type="range" min="0" max="127" />

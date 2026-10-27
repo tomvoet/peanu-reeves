@@ -10,6 +10,7 @@ You need [Vite+](https://viteplus.dev) installed (`vp`).
 
 ```sh
 vp install
+vp run samples        # downloads the piano samples into public/samples (~65 MB, once)
 vp run dev            # http://localhost:3000
 vp run dev:https      # https on your network, for a tablet next to the piano
 vp test               # unit tests
@@ -65,7 +66,15 @@ Everything lives in the browser (IndexedDB and a bit of localStorage). Settings 
 
 If you link a folder, it gets rescanned on every launch. Chrome asks for permission again after a restart, the library has a button for that. Edited files keep their history.
 
-Piano samples load from GitHub Pages the first time and are cached after that.
+Piano samples are served from this site, never from a third party, and cached after the first load.
+
+## Sounds
+
+Settings › Audio picks the sound. `vp run samples` downloads the sets, already converted to Ogg and M4A by [smpldsnds](https://github.com/smpldsnds), and the deploy does the same.
+
+- Grand piano: [Splendid Grand Piano](https://github.com/sfzinstruments/SplendidGrandPiano), public domain samples by Akai.
+- CP80, Wurlitzer EP200 and Pianet T: [Greg Sullivan's E-Pianos](https://github.com/sfzinstruments/GregSullivan.E-Pianos) by [Greg Sullivan](http://www.sullivang.net/), mapped by kinwie, licensed [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). Converted from FLAC.
+- FM piano: Yamaha TX81Z from the [Versilian Community Sample Library](https://github.com/sgossner/VCSL), CC0.
 
 ## License
 

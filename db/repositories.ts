@@ -1,4 +1,5 @@
 import { defu } from 'defu'
+import { DEFAULT_TONE, type ToneId } from '../engine/audio/tones'
 import type { RemoteBindings } from '../engine/midi-input/remote'
 import type { NoteLabels } from '../engine/render/renderer'
 import {
@@ -20,6 +21,7 @@ export interface AppSettings {
   keyboardInput: boolean
   volume: number
   maxVoices: number
+  tone: ToneId
   lookahead: number
   noteLabels: NoteLabels
   /** Show only the octaves a piece uses. */
@@ -42,6 +44,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   keyboardInput: true,
   volume: 100,
   maxVoices: 64,
+  tone: DEFAULT_TONE,
   lookahead: 2.5,
   noteLabels: 'c',
   fitKeyboard: true,

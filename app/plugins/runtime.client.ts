@@ -1,5 +1,6 @@
 import { createRepositories } from '#db/repositories'
 import { Runtime } from '#engine/runtime'
+import type { LoadProgress } from '#engine/audio/piano'
 import { WebMidiInput } from '#engine/midi-input/web-midi'
 import type { AudioStatus, MidiStatus } from '~/composables/useApp'
 
@@ -9,7 +10,12 @@ export default defineNuxtPlugin(async () => {
   const repos = createRepositories()
   const settings = reactive(await repos.settings.load())
 
-  const runtime = new Runtime({ maxVoices: settings.maxVoices, volume: settings.volume })
+  const runtime = new Runtime({
+    maxVoices: settings.maxVoices,
+    volume: settings.volume,
+    tone: settings.tone,
+    samplesUrl: `${useRuntimeConfig().app.baseURL}samples`,
+  })
   runtime.setKeyboardEnabled(settings.keyboardInput)
   runtime.remote.bindings = { ...settings.remote }
 
@@ -22,10 +28,18 @@ export default defineNuxtPlugin(async () => {
   })
 
   useEventListener(runtime.ctx, 'statechange', () => (audio.state = runtime.ctx.state))
-  runtime.piano
-    .load(({ loaded, total }) => Object.assign(audio, { loaded, total }))
-    .then(() => (audio.ready = true))
-    .catch((e: unknown) => (audio.error = errorMessage(e)))
+  const loadWithStatus = (load: (onProgress: (p: LoadProgress) => void) => Promise<void>) => {
+    Object.assign(audio, { loaded: 0, total: 0, ready: false, error: null })
+    const pending = load(({ loaded, total }) => Object.assign(audio, { loaded, total }))
+    pending
+      .then(() => runtime.piano.ready === pending && (audio.ready = true))
+      .catch((e: unknown) => runtime.piano.ready === pending && (audio.error = errorMessage(e)))
+  }
+  loadWithStatus((p) => runtime.piano.load(p))
+  watch(
+    () => settings.tone,
+    (tone) => loadWithStatus((p) => runtime.piano.setTone(tone, p)),
+  )
 
   const resume = () => void runtime.ctx.resume()
   useEventListener(window, ['pointerdown', 'keydown'], resume, { passive: true })

@@ -55,11 +55,11 @@ export default defineNuxtConfig({
       globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
       runtimeCaching: [
         {
-          urlPattern: /^https:\/\/smpldsnds\.github\.io\/.*/,
+          urlPattern: /\/samples\/[\w-]+\/[\w.-]+\.(?:json|ogg|m4a)$/,
           handler: 'CacheFirst',
           options: {
             cacheName: 'piano-samples',
-            expiration: { maxEntries: 500 },
+            expiration: { maxEntries: 1000 },
             cacheableResponse: { statuses: [0, 200] },
           },
         },

@@ -1,4 +1,14 @@
-import { CacheStorage, SplendidGrandPiano, type StopFn } from 'smplr'
+import { CacheStorage, Instrument, type SmplrPreset, type StopFn } from 'smplr'
+import type { ToneId } from './tones'
+
+/** Loads a preset written by scripts/fetch-samples.ts from the site's own sample folder. */
+const SelfHosted = Instrument<{ url: string }>(async (_ctx, { url }, smplr) => {
+  const res = await fetch(`${url}/preset.json`)
+  if (!res.ok) throw new Error(`Piano samples missing at ${url} (${res.status})`)
+  const preset = (await res.json()) as SmplrPreset
+  await smplr.loadInstrument({ ...preset, samples: { ...preset.samples, baseUrl: url } })
+})
+type SelfHosted = ReturnType<typeof SelfHosted>
 
 interface Voice {
   pitch: number
@@ -10,6 +20,9 @@ interface Voice {
 export interface PianoOptions {
   maxVoices: number
   volume: number
+  tone: ToneId
+  /** Folder holding one subfolder per tone. */
+  samplesUrl: string
 }
 
 export interface LoadProgress {
@@ -22,7 +35,7 @@ export interface LoadProgress {
  * Sustain is handled here so that re-striking and voice stealing stay predictable.
  */
 export class Piano {
-  private instrument: SplendidGrandPiano | null = null
+  private instrument: SelfHosted | null = null
   private readonly voices: Voice[] = []
   private readonly scheduled = new Set<StopFn>()
   private pedalDown = false
@@ -34,17 +47,39 @@ export class Piano {
   ) {}
 
   load(onProgress?: (p: LoadProgress) => void): Promise<void> {
-    this.ready ??= (async () => {
-      const storage = globalThis.isSecureContext ? CacheStorage() : undefined
-      this.instrument = SplendidGrandPiano(this.ctx, {
-        volume: this.opts.volume,
-        decayTime: 0.4,
-        onLoadProgress: onProgress,
-        ...(storage && { storage }),
-      })
-      await this.instrument.ready
-    })()
+    this.ready ??= this.loadTone(this.opts.tone, onProgress)
     return this.ready
+  }
+
+  /** The current tone keeps playing until the new one is ready. */
+  setTone(tone: ToneId, onProgress?: (p: LoadProgress) => void): Promise<void> {
+    this.opts.tone = tone
+    this.ready = this.loadTone(tone, onProgress)
+    return this.ready
+  }
+
+  private async loadTone(tone: ToneId, onProgress?: (p: LoadProgress) => void): Promise<void> {
+    const storage = globalThis.isSecureContext ? CacheStorage() : undefined
+    const next = SelfHosted(this.ctx, {
+      url: `${this.opts.samplesUrl.replace(/\/$/, '')}/${tone}`,
+      volume: this.opts.volume,
+      onLoadProgress: onProgress,
+      ...(storage && { storage }),
+    })
+    try {
+      await next.ready
+    } catch (e) {
+      next.dispose()
+      throw e
+    }
+    if (this.opts.tone !== tone) return void next.dispose()
+
+    const previous = this.instrument
+    this.instrument = next
+    if (previous) {
+      this.allNotesOff()
+      previous.dispose()
+    }
   }
 
   get loaded(): boolean {

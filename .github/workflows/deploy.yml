@@ -24,6 +24,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - uses: actions/cache@v5
+        with:
+          path: public/samples
+          key: samples-${{ hashFiles('scripts/fetch-samples.ts', 'engine/audio/tones.ts') }}
+      - run: pnpm samples
       - run: pnpm nuxt build --preset github_pages
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
