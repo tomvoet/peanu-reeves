@@ -39,6 +39,8 @@ const repos = useRepos()
 const library = useLibrary()
 
 const piece = ref<Piece>()
+/** Where the file is on this device. */
+const path = ref<string>()
 const song = shallowRef<Song>()
 const bytes = shallowRef<ArrayBuffer>()
 const sections = ref<Section[]>([])
@@ -131,6 +133,7 @@ onMounted(async () => {
     await library.ready
     piece.value = await repos.pieces.get(hash)
     if (!piece.value) throw new Error('This piece is not in the library.')
+    path.value = (await repos.locations.get(hash))?.path
     bytes.value = await library.loadBytes(piece.value)
 
     const override = await repos.overrides.get(hash)
@@ -297,7 +300,7 @@ onMounted(async () => {
 
     <section v-if="piece" class="card row">
       <div class="muted">
-        <div>{{ piece.path }}</div>
+        <div v-if="path">{{ path }}</div>
         <div class="num hash">{{ hash }}</div>
       </div>
       <span class="spacer" />

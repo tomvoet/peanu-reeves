@@ -32,7 +32,7 @@ const router = useRouter()
 
 const pieces = ref<Piece[]>([])
 const attempts = ref<Attempt[]>([])
-const focus = ref<number | null>(null)
+const focus = ref<string | null>(null)
 
 const selected = computed({
   get: () => (typeof route.query.piece === 'string' ? route.query.piece : ''),
@@ -126,7 +126,7 @@ function handsLabel(a: Attempt) {
   return `${HAND_LABEL[L]} / ${HAND_LABEL[R]}`
 }
 
-function toggleFocus(id: number | undefined) {
+function toggleFocus(id: string | undefined) {
   focus.value = id === undefined || id === focus.value ? null : id
 }
 

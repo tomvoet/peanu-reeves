@@ -450,7 +450,7 @@ watch(
   () => route.query.recording,
   async (id) => {
     if (!id) return
-    const r = await repos.recordings.get(Number(id))
+    const r = await repos.recordings.get(String(id))
     if (!r) return
     stopPlayback()
     saved.value = r

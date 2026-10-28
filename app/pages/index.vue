@@ -307,7 +307,7 @@ onMounted(async () => {
             <span class="muted">{{ formatAgo(piece.lastPlayedAt) }}</span>
             <span class="row-actions">
               <button
-                v-if="piece.source === 'import'"
+                v-if="piece.source !== 'folder'"
                 class="ghost round remove"
                 :class="{ confirm: confirmRemove === piece.hash }"
                 :aria-label="

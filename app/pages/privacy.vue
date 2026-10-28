@@ -54,6 +54,12 @@
         MIDI keyboard input and linked folders are handled entirely by your browser after you allow
         access. Files in a linked folder are only read locally.
       </p>
+      <p>
+        If you turn on sync, the app writes your practice data and MIDI files into a folder you
+        choose and reads what your other devices wrote there. The app itself still sends nothing.
+        Whatever keeps that folder in sync, such as Dropbox, OneDrive, iCloud Drive or Syncthing, is
+        your own choice and works under its own terms.
+      </p>
     </section>
 
     <section class="card grid">

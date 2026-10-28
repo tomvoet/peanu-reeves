@@ -117,7 +117,7 @@ const lastTake = shallowRef<Take | null>(null)
 const replay = shallowRef<ReplayState | null>(null)
 const sheetTab = ref<SheetTab>('options')
 const takeFilter = ref<TakeFilter>('loop')
-const openTakeId = ref<number>()
+const openTakeId = ref<string>()
 const drill = ref<DrillState | null>(null)
 
 const canvasBox = useTemplateRef<HTMLElement>('canvasBox')
@@ -457,8 +457,8 @@ useIntervalFn(() => (status.value = session.value?.status ?? null), 80)
 watch(
   session,
   async (s) => {
-    const id = Number(route.query.take)
-    if (!s || !Number.isInteger(id)) return
+    const id = route.query.take
+    if (!s || typeof id !== 'string' || !id) return
     const take = await repos.takes.get(id)
     if (take?.hash === hash.value) startReplay(take, 'you', false)
   },
@@ -616,7 +616,7 @@ async function loadTakes(): Promise<void> {
 /** Keeps what was played during a pass so it can be listened to and compared later. */
 async function saveTake(
   take: RecordedTake,
-  meta: Pick<PartialTake, 'startedAt' | 'tempo' | 'loop' | 'accuracy'> & { attemptId?: number },
+  meta: Pick<PartialTake, 'startedAt' | 'tempo' | 'loop' | 'accuracy'> & { attemptId?: string },
 ): Promise<void> {
   const record: Omit<Take, 'id'> = {
     hash: hash.value,
@@ -865,7 +865,7 @@ async function saveSection() {
   sections.value = await repos.sections.forPiece(hash.value)
 }
 
-async function deleteSection(id: number | undefined) {
+async function deleteSection(id: string | undefined) {
   if (id === undefined) return
   await repos.sections.remove(id)
   sections.value = await repos.sections.forPiece(hash.value)

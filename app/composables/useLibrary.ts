@@ -1,4 +1,4 @@
-import type { Piece, PieceSource, PieceThumb } from '#db/schema'
+import type { LibraryPiece, Piece, PieceSource, PieceThumb } from '#db/schema'
 import type { HandSplit } from '#engine/types'
 import { parseSong, summarizeMidi } from '#engine/song/parse'
 import { thumbnailOf } from '#engine/song/thumbnail'
@@ -59,7 +59,7 @@ function moveLocalOptions(from: string, to: string): void {
 function createLibrary() {
   const repos = useRepos()
 
-  const pieces = ref<Piece[]>([])
+  const pieces = ref<LibraryPiece[]>([])
   const folder = shallowRef<FileSystemDirectoryHandle | null>(null)
   const permission = ref<PermissionState | null>(null)
   const scanning = ref(false)
@@ -67,43 +67,44 @@ function createLibrary() {
   const progress = reactive(emptyProgress())
   const supportsFolders = typeof window !== 'undefined' && 'showDirectoryPicker' in window
 
-  const refresh = async (): Promise<Piece[]> => (pieces.value = await repos.pieces.all())
+  const refresh = async (): Promise<LibraryPiece[]> => (pieces.value = await repos.pieces.library())
 
-  /** Returns the content hash and whether the piece is new to the library. */
+  /**
+   * Returns the content hash, whether the piece is new and whether it is new on this device.
+   * A piece can exist without being on this device, e.g. after its file was removed from the folder.
+   */
   async function register(
     data: ArrayBuffer,
     path: string,
     source: PieceSource,
     file: FileStamp = {},
-  ): Promise<{ hash: string; created: boolean }> {
+  ): Promise<{ hash: string; created: boolean; linked: boolean }> {
     const hash = await sha256Hex(data)
-    const existing = await repos.pieces.get(hash)
+    const [existing, location] = await Promise.all([
+      repos.pieces.get(hash),
+      repos.locations.get(hash),
+    ])
 
-    if (existing) {
-      if (
-        existing.path !== path ||
-        existing.source !== source ||
-        existing.fileSize !== file.fileSize ||
-        existing.fileModified !== file.fileModified
-      ) {
-        await repos.pieces.put({ ...existing, path, source, ...file })
-      }
-      return { hash, created: false }
+    if (
+      location?.path !== path ||
+      location.source !== source ||
+      location.fileSize !== file.fileSize ||
+      location.fileModified !== file.fileModified
+    ) {
+      await repos.locations.put({ hash, source, path, ...file })
     }
+    if (existing) return { hash, created: false, linked: !location }
 
     const summary = summarizeMidi(data)
     await repos.pieces.put({
       hash,
       title: titleFrom(path, summary.title),
-      path,
-      source,
       durationSec: summary.durationSec,
       trackCount: summary.trackCount,
       addedAt: Date.now(),
       thumb: makeThumb(data),
-      ...file,
     })
-    return { hash, created: true }
+    return { hash, created: true, linked: true }
   }
 
   function makeThumb(data: ArrayBuffer, handSplit?: HandSplit): PieceThumb | undefined {
@@ -159,8 +160,8 @@ function createLibrary() {
         progress.total = files.length
       }
 
-      const before = (await repos.pieces.all()).filter((p) => p.source === 'folder')
-      const byPath = new Map(before.map((p) => [p.path, p]))
+      const before = await repos.locations.folder()
+      const byPath = new Map(before.map((l) => [l.path, l]))
       const seen = new Set<string>()
       const createdAt = new Map<string, string>()
 
@@ -171,13 +172,15 @@ function createLibrary() {
           if (known?.fileSize === file.size && known.fileModified === file.lastModified) {
             seen.add(known.hash)
           } else {
-            const { hash, created } = await register(await file.arrayBuffer(), path, 'folder', {
-              fileSize: file.size,
-              fileModified: file.lastModified,
-            })
+            const { hash, created, linked } = await register(
+              await file.arrayBuffer(),
+              path,
+              'folder',
+              { fileSize: file.size, fileModified: file.lastModified },
+            )
             seen.add(hash)
-            if (created) {
-              createdAt.set(path, hash)
+            if (created) createdAt.set(path, hash)
+            if (linked) {
               if (!known) progress.added++
               await refresh()
             }
@@ -189,16 +192,16 @@ function createLibrary() {
         if (progress.done % 16 === 0) await yieldToBrowser()
       }
 
-      for (const p of before) {
-        if (seen.has(p.hash)) continue
+      for (const l of before) {
+        if (seen.has(l.hash)) continue
         // Same path, new content: the file was edited, so its history moves along.
-        const edited = createdAt.get(p.path)
+        const edited = createdAt.get(l.path)
         if (edited) {
-          await repos.pieces.rehash(p.hash, edited)
-          moveLocalOptions(p.hash, edited)
+          await repos.pieces.rehash(l.hash, edited)
+          moveLocalOptions(l.hash, edited)
           progress.updated++
         } else {
-          await repos.pieces.remove(p.hash)
+          await repos.locations.remove(l.hash)
           progress.removed++
         }
       }
@@ -215,8 +218,6 @@ function createLibrary() {
   async function init() {
     folder.value = (await repos.settings.folder()) ?? null
     permission.value = folder.value ? await folder.value.queryPermission({ mode: 'read' }) : null
-    // Earlier versions shipped demo songs, which are gone now.
-    await repos.pieces.removeLegacyDemos()
     await refresh()
   }
 
@@ -247,8 +248,7 @@ function createLibrary() {
     await repos.settings.setFolder(null)
     folder.value = null
     permission.value = null
-    for (const p of await repos.pieces.all())
-      if (p.source === 'folder') await repos.pieces.remove(p.hash)
+    await repos.locations.clearFolder()
     await refresh()
   }
 
@@ -265,17 +265,31 @@ function createLibrary() {
     return hashes
   }
 
-  async function loadBytes(piece: Piece): Promise<ArrayBuffer> {
-    if (piece.source === 'import') {
-      const data = await repos.files.get(piece.hash)
-      if (!data) throw new Error('The imported file is missing from storage.')
-      return data
+  /** With `prompt` off, a folder file that needs permission first fails instead of asking. */
+  async function loadBytes(
+    piece: Pick<Piece, 'hash'>,
+    { prompt = true } = {},
+  ): Promise<ArrayBuffer> {
+    const location = await repos.locations.get(piece.hash)
+    if (location?.source === 'folder' && folder.value) {
+      try {
+        if ((await folder.value.queryPermission({ mode: 'read' })) !== 'granted') {
+          if (!prompt) throw new Error('The library folder needs permission again.')
+          permission.value = await folder.value.requestPermission({ mode: 'read' })
+        }
+        const file = await (await resolvePath(folder.value, location.path)).getFile()
+        return await file.arrayBuffer()
+      } catch (e) {
+        const stored = await repos.files.get(piece.hash)
+        if (stored) return stored
+        throw e
+      }
     }
-    if (!folder.value) throw new Error('No library folder is linked.')
-    if ((await folder.value.queryPermission({ mode: 'read' })) !== 'granted') {
-      permission.value = await folder.value.requestPermission({ mode: 'read' })
-    }
-    return (await (await resolvePath(folder.value, piece.path)).getFile()).arrayBuffer()
+
+    const stored = await repos.files.get(piece.hash)
+    if (stored) return stored
+    if (location?.source === 'folder') throw new Error('No library folder is linked.')
+    throw new Error('The file for this piece is not on this device.')
   }
 
   async function remove(piece: Piece) {

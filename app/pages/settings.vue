@@ -47,6 +47,8 @@ const audio = useAudioStatus()
 const repos = useRepos()
 const library = useLibrary()
 const backups = useBackup()
+const sync = useSync()
+const confirmStopSync = refAutoReset(false, 4000)
 
 const latency = ref(runtime.latency)
 const lastNote = ref<string | null>(null)
@@ -147,6 +149,7 @@ async function confirmRestore() {
 
   pendingRestore.value = null
   dataStatus.value = `Restored ${backup.pieces.length} pieces and ${backup.attempts.length} passes.`
+  void sync.run()
 }
 
 onMounted(() => void backups.checkPersisted())
@@ -375,6 +378,60 @@ onBeforeUnmount(() => {
       </ul>
     </section>
 
+    <section id="sync" class="card grid">
+      <h2>Sync between devices</h2>
+      <p class="muted">
+        Pick a folder that Dropbox, OneDrive, iCloud Drive or Syncthing keeps in sync, and the same
+        folder on your other devices. Pieces, passes, takes, recordings, sections and hand fixes
+        travel through it, MIDI files included. Nothing goes anywhere else. Set the folder to
+        "always keep on this device" in your sync app.
+      </p>
+      <template v-if="sync.folder.value">
+        <p class="muted" role="status">
+          Folder <b>{{ sync.folder.value.name }}</b> ·
+          <template v-if="sync.permission.value === 'prompt' || sync.permission.value === 'denied'"
+            >needs access again</template
+          >
+          <template v-else-if="sync.running.value">syncing…</template>
+          <template v-else
+            >last synced <b>{{ formatAgo(sync.lastSyncAt.value ?? undefined) }}</b></template
+          >
+          <template v-if="sync.report.value">
+            · {{ sync.report.value.devices }} other
+            {{ sync.report.value.devices === 1 ? 'device' : 'devices' }}</template
+          >
+          <template v-if="sync.pending.value"> · {{ sync.pending.value }} changes to send</template>
+        </p>
+        <div class="row">
+          <button
+            v-if="sync.permission.value === 'prompt' || sync.permission.value === 'denied'"
+            class="primary"
+            @click="sync.resume()"
+          >
+            Resume sync
+          </button>
+          <button v-else :disabled="sync.running.value" @click="sync.run()">Sync now</button>
+          <button
+            class="ghost"
+            :class="{ danger: confirmStopSync }"
+            @click="confirmStopSync ? sync.stop() : (confirmStopSync = true)"
+          >
+            {{ confirmStopSync ? 'Click again to stop' : 'Stop syncing' }}
+          </button>
+        </div>
+        <p v-if="sync.report.value?.problems.length" class="muted">
+          Skipped: {{ sync.report.value.problems.join('; ') }}
+        </p>
+      </template>
+      <div v-else class="row">
+        <button class="primary" :disabled="!sync.supported" @click="sync.choose()">
+          Choose sync folder…
+        </button>
+        <span v-if="!sync.supported" class="muted">This browser cannot open folders.</span>
+      </div>
+      <p v-if="sync.error.value" class="notice error" role="alert">{{ sync.error.value }}</p>
+    </section>
+
     <section class="card grid">
       <h2>Your data</h2>
       <p class="muted">
@@ -401,7 +458,9 @@ onBeforeUnmount(() => {
           {{ new Date(pendingRestore.exportedAt).toLocaleString() }} ({{
             pendingRestore.pieces.length
           }}
-          pieces, {{ pendingRestore.attempts.length }} passes)?</span
+          pieces, {{ pendingRestore.attempts.length }} passes)?<template v-if="sync.folder.value">
+            Other devices keep their data and it comes back through sync.</template
+          ></span
         >
         <span class="spacer" />
         <button class="ghost" @click="pendingRestore = null">Cancel</button>
@@ -482,5 +541,9 @@ dt {
 
 dd {
   margin: 0;
+}
+
+.danger {
+  color: var(--danger);
 }
 </style>

@@ -8,7 +8,17 @@ const errorMessage = (e: unknown): string => (e instanceof Error ? e.message : S
 
 export default defineNuxtPlugin(async () => {
   const repos = createRepositories()
+  // Before anything writes, so every change while sync is on gets recorded.
+  const device = await repos.sync.getState<string>('device')
+  if (device) repos.sync.start(device)
+
   const settings = reactive(await repos.settings.load())
+  /** What is stored, so only settings that actually changed get saved (and synced). */
+  let saved: Record<string, unknown> = JSON.parse(JSON.stringify(settings))
+  repos.sync.hooks.settings = (values) => {
+    saved = { ...saved, ...JSON.parse(JSON.stringify(values)) }
+    Object.assign(settings, values)
+  }
 
   const runtime = new Runtime({
     maxVoices: settings.maxVoices,
@@ -94,7 +104,12 @@ export default defineNuxtPlugin(async () => {
   watchDebounced(
     settings,
     (s) => {
-      void repos.settings.save(toRaw(s))
+      const current: Record<string, unknown> = JSON.parse(JSON.stringify(s))
+      const changed = Object.fromEntries(
+        Object.entries(current).filter(([k, v]) => JSON.stringify(v) !== JSON.stringify(saved[k])),
+      )
+      saved = current
+      if (Object.keys(changed).length) void repos.settings.save(changed)
       runtime.piano.configure({ maxVoices: s.maxVoices, volume: s.volume })
       runtime.setKeyboardEnabled(s.keyboardInput)
       runtime.midi.select(s.midiDeviceId)
